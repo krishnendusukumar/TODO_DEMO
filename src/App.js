@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import 'antd/dist/reset.css';
 import { data, status } from './components/data'
 import { useState } from "react";
-import { Button, Table, Modal, Tag, Input, Select } from "antd";
+import { Button, Table, Modal, Tag, Input, Select, DatePicker } from "antd";
 import { DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import './App.css'
+const { Option } = Select;
 
 
 
@@ -15,37 +16,39 @@ const App = () => {
   const [count, setCount] = useState(15);
   const [isEditting, setIsEditting] = useState(false);
   const [edit, setEdit] = useState(null);
-  const [tag, setTag] = useState("")
-  const [tagarr, setTagarr] = useState([])
+  const TagRef = useRef();
+  const [type, setType] = useState('')
 
+
+  useEffect(() => {
+    if (JSON.parse(localStorage.getItem('todos'))) {
+      const items = JSON.parse(localStorage.getItem("todos"))
+      setData(items)
+    }
+  }, [])
+
+  const month = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
   //     Adding empty task row in the list
 
   const handleAdd = () => {
-    const month = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const d = new Date();
     let name = month[d.getMonth()];
     let date = d.getDate();
     let time = d.getHours();
     let min = d.getMinutes();
-    let timestamps = date + " " + name + " " + time + ":" + min;
+    let timestamps = date + " " + name;
     const newData = {
       "id": count,
       "timeStamp": timestamps,
-      "Title": 'HEnter task',
-      "Description": "Enter description",
+      "Title": '',
+      "Description": "",
       "Tags": [],
       "Status": "OPEN",
       "DUE_DATE": ""
     }
     setCount(count + 1)
-    console.log(count)
-    setData([newData, ...Data])
-    setCount(count + 1)
-    console.log(data)
-
-    alert("Edit your task in actions")
-
+    Edit(newData, 'add')
   }
 
 
@@ -56,9 +59,9 @@ const App = () => {
     Modal.confirm({
       title: "Are you sure you want to delete this",
       onOk: () => {
-        setData((pre) => {
-          return pre.filter((person) => person.id !== record.id);
-        });
+        let newTodo = Data.filter((todo) => todo.id !== record.id)
+        setData(newTodo);
+        window.localStorage.setItem('todos', JSON.stringify(newTodo));
       },
     });
   };
@@ -66,29 +69,23 @@ const App = () => {
 
   //  check if edit button is being clicked or not
 
-  const Edit = (record) => {
+  const Edit = (record, type) => {
     setIsEditting(true);
     setEdit({ ...record })
+    setType(type);
   };
 
   // On pushing cancel button in edit mode
 
   const resetEditting = () => {
+    console.log('i am called')
     setIsEditting(false)
     setEdit(null)
+    TagRef.current = ''
+    setType('');
   }
 
   // adding the tag in the list
-
-  const addTag = () => {
-    setCount(count + 1);
-    console.log("here i am")
-    setTagarr(tag.split(','))
-    console.log(tagarr)
-    setEdit((pre) => {
-      return { ...pre, Tags: tagarr };
-    });
-  }
 
   // hard code data bcz of unavailablity of suitable api
 
@@ -153,7 +150,7 @@ const App = () => {
           <div className="flex">
             <EditOutlined
               style={{ color: "black" }}
-              onClick={() => Edit(record)}
+              onClick={() => Edit(record, 'edit')}
             />
             <DeleteOutlined
               style={{ color: "red" }}
@@ -166,7 +163,18 @@ const App = () => {
   ]
 
 
+  // useEffect(() => {
+  //   localStorage.setItem('item', JSON.stringify(Data));
+  // }, [Data])
 
+
+
+  const handleStatusChange = (value) => {
+    console.log(value)
+    setEdit((pre) => {
+      return { ...pre, Status: value };
+    });
+  }
 
 
   return (
@@ -175,7 +183,7 @@ const App = () => {
         <h2 className="heading">Make a list of tasks</h2>
         <div className="table">
 
-          <Button onClick={handleAdd} type="primary" style={{ marginBottom: 16 }}>Add a Task</Button>
+          <Button onClick={() => handleAdd()} type="primary" style={{ marginBottom: 16 }}>Add a Task</Button>
 
 
           <Table dataSource={Data} columns={columns}
@@ -184,24 +192,24 @@ const App = () => {
 
           {/* Modal imported from antd for edit section */}
 
+
+
           <Modal
-            title="Edit Details"
+            title={type === 'edit' ? "Edit Details" : "Add Task"}
             open={isEditting}
             onCancel={() => {
               resetEditting()
-              setTag()
             }}
             onOk={() => {
-              setTagarr(tag.split(','))
-              setData((pre) => {
-                return pre.map((student) => {
-                  if (student.id === edit.id) {
-                    return edit;
-                  } else {
-                    return student;
-                  }
-                });
-              });
+              type === 'edit' ?
+                setData((pre) => {
+                  console.log(pre)
+                  return pre?.map((student) => (student.id === edit.id) ? edit : student
+                  );
+                })
+                : setData(pre => [edit, ...pre]);
+              const localStorage = type === 'edit' ? Data : [edit, ...Data]
+              window.localStorage.setItem('todos', JSON.stringify(localStorage));
               resetEditting()
             }}
             okText="Save"
@@ -229,29 +237,31 @@ const App = () => {
             />
             <Input
               placeholder="Enter the Tag"
+              value={edit?.Tags}
               onChange={(e) => {
-                setTag(e.target.value)
+                TagRef.current = e.target.value;
+                setEdit((pre) => {
+                  return { ...pre, Tags: TagRef.current.split(" ") }
+                })
               }}
             />
-            <Button onClick={addTag}> Add tag</Button>
+            <DatePicker onChange={(date) => {
+              const monthName = month[date.$M]
+              setEdit((pre) => {
+                return { ...pre, Due_Date: `${date.$D} ${monthName}` };
+              });
+            }}
 
-            <Input
-              placeholder="Enter the Due Date"
-              onChange={(e) => {
-                setEdit((pre) => {
-                  return { ...pre, Due_Date: e.target.value };
-                });
-              }}
             />
-            <Input
-              placeholder="Enter the Status"
-              onChange={(e) => {
-                setEdit((pre) => {
-                  return { ...pre, Status: e.target.value };
-                });
-              }}
-            />
-            <Button onClick={addTag}> Add Status</Button>
+            <label htmlFor="">Status :</label>
+            <Select defaultValue="Open"
+              style={{ width: 100 }}
+              onChange={(value) => handleStatusChange(value)}
+            >
+              <Option value="Open">Open</Option>
+              <Option value="Active">Active</Option>
+              <Option value="Closed">Closed</Option>
+            </Select>
           </Modal>
         </div>
       </div>
